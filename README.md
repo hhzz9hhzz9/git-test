@@ -1,2 +1,116 @@
 # git-test
-{"attributes":{"DeviceNo":{"type":"string","maxLength":100,"default":""},"RackNo":{"type":"number","default":1},"FrameNo":{"type":"number","valueFrom":"parent"},"ModuleNo":{"type":"number","default":-1},"SlotNo":{"type":"number","valueFrom":"SlotNumber"},"PortNo":{"type":"number","default":-1},"SlotPos":{"type":"number","valueFrom":"boardSlotPos"},"SubSlotNo":{"type":"number","default":-1},"BoardName":{"type":"string","maxLength":50,"valueFrom":"ProductName"},"BOMCode":{"type":"string","maxLength":50,"valueFrom":"PartNumber"},"BoardType":{"type":"string","maxLength":100,"valueFrom":"Model"},"OSVer":{"type":"string","maxLength":100,"valueFrom":"OSVersion"},"SoftVer":{"type":"string","maxLength":100,"valueFrom":"softVer"},"LogicVer":{"type":"string","maxLength":100,"default":""},"BiosVer":{"type":"string","maxLength":100,"valueFrom":"BiosVersion"},"SerialNumber":{"type":"string","maxLength":100,"valueFrom":"SerialNumber"},"BoardFlash":{"type":"txt","default":""},"InventoryUnitId":{"type":"string","maxLength":100,"valueFrom":"increase"},"InventoryUnitType":{"type":"string","maxLength":100,"default":"Hardware"},"VendorUnitFamilyType":{"type":"string","maxLength":100,"valueFrom":"vendorUnitFamilyType"},"VendorUnitTypeNumber":{"type":"string","maxLength":100,"default":"0"},"VendorName":{"type":"string","maxLength":100,"valueFrom":"Manufacturer"},"VersionNumber":{"type":"string","maxLength":100,"default":""},"DateOfManufacture":{"type":"string","maxLength":50,"default":""},"DateOfLastService":{"type":"string","maxLength":50,"default":""},"UnitPosition":{"type":"string","maxLength":200,"default":""}},"objectType":["SMMInfo","BoardInfo","FanInfo","PowerInfo"]}
+package main
+
+import (
+	"crypto/rand"
+	"errors"
+	"fmt"
+	"math/big"
+)
+
+type CharacterType string
+
+const (
+	specialArray                 = "!\"#$%&'()*+,-./\\:;<=>?@[]^`{_|}~"
+	letterRange                  = 26
+	numberRange                  = 10
+	special        CharacterType = "SPECIAL"
+	lower          CharacterType = "LOWER"
+	upper          CharacterType = "UPPER"
+	number         CharacterType = "NUMBER"
+	lowerBegin                   = 97
+	upperBegin                   = 65
+	numberBegin                  = 48
+	minVariousType               = 4
+)
+
+func getRandomInt(s string) byte {
+	i, err := rand.Int(rand.Reader, big.NewInt(int64(len(s))))
+	if err != nil {
+		panic("生成密码失败: " + err.Error())
+	}
+	return s[i.Int64()]
+}
+
+func main() {
+	s,_ := generateRandomPassword(10)
+	fmt.Println(s)
+}
+
+func generateRandomPassword(length int) (string, error) {
+	content := make([]uint8, length, length)
+	pwCharsIndex := make([]int, length, length)
+	for i, _ := range pwCharsIndex {
+		pwCharsIndex[i] = i
+	}
+	takeTypes := []CharacterType{lower, upper, number, special}
+	fixedTypes := []CharacterType{lower, upper, number, special}
+	typeCount := 0
+	for len(pwCharsIndex) > 0 {
+		index, err := rand.Int(rand.Reader, big.NewInt(int64(len(pwCharsIndex))))
+		if err != nil {
+			return "", err
+		}
+		pwIndex := pwCharsIndex[index.Int64()]
+		pwCharsIndex = append(pwCharsIndex[:index.Int64()], pwCharsIndex[index.Int64()+1:]...)
+		var character byte
+		if typeCount < minVariousType {
+			takeIndex, err := rand.Int(rand.Reader, big.NewInt(int64(len(takeTypes))))
+			if err != nil {
+				return "", err
+			}
+			if character, err = generateCharacter(takeTypes[takeIndex.Int64()]); err != nil {
+				return "", err
+			}
+			takeTypes = append(takeTypes[:takeIndex.Int64()], takeTypes[takeIndex.Int64()+1:]...)
+			typeCount++
+		}else {
+			fixedIndex, err := rand.Int(rand.Reader, big.NewInt(int64(len(fixedTypes))))
+			if err != nil {
+				return "", err
+			}
+			if character, err = generateCharacter(fixedTypes[fixedIndex.Int64()]); err != nil {
+				return "", err
+			}
+			content[pwIndex] = character
+		}
+	}
+	return string(content), nil
+}
+
+func sliceRemove(s *[]interface{}, index int) interface{} {
+	tmp := (*s)[index]
+	*s = append((*s)[:index], (*s)[index+1:]...)
+	return tmp
+}
+
+func generateCharacter(stringType CharacterType) (uint8, error) {
+	switch stringType {
+	case lower: // 随机小写
+		i, err := rand.Int(rand.Reader, big.NewInt(int64(letterRange)))
+		if err != nil {
+			return 0, err
+		}
+		return uint8(i.Int64() + lowerBegin), nil
+	case upper: // 随机大写
+		i, err := rand.Int(rand.Reader, big.NewInt(int64(letterRange)))
+		if err != nil {
+			return 0, err
+		}
+		return uint8(i.Int64() + upperBegin), nil
+	case number: // 随机数字
+		i, err := rand.Int(rand.Reader, big.NewInt(int64(numberRange)))
+		if err != nil {
+			return 0, err
+		}
+		return uint8(i.Int64() + numberBegin), nil
+	case special: // 随机字符
+		i, err := rand.Int(rand.Reader, big.NewInt(int64(len(specialArray))))
+		if err != nil {
+			return 0, err
+		}
+		return specialArray[i.Int64()], nil
+	}
+	return 0, errors.New("byte zero")
+}
+
